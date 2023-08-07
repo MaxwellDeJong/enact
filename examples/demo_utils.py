@@ -35,9 +35,9 @@ def get_policy_visualizer(Action, create_trajectory, plot_trajectory, control_fn
         return Action(np.array(list(control(
           state.position[0],
           state.goal1_position[0],
-          state.has_reached_goal1[0],
+          state.has_been_at_goal1[0],
           state.goal2_position[0],
-          state.has_reached_goal2[0],
+          state.has_been_at_goal2[0],
           state.rotation[0])))[np.newaxis])
 
 
@@ -54,7 +54,7 @@ def get_policy_visualizer(Action, create_trajectory, plot_trajectory, control_fn
   return PolicyVisualizer
 
 #def get_policy_checker(policy_visualizer, sample_input, func_name='control'):
-def get_policy_checker(Action, create_trajectory, plot_trajectory, sample_input, func_name='control'):
+def get_policy_checker(Action, create_trajectory, plot_trajectory, sample_input, func_name='control', code_reference=''):
 
   @enact.typed_invokable(enact.Str, llm_task.ProcessedOutput)
   class PolicyChecker(enact.Invokable):
@@ -74,6 +74,7 @@ def get_policy_checker(Action, create_trajectory, plot_trajectory, sample_input,
       else:
         code = input[len('```'):-len('```')]
       def_dict = {}
+      code = code_reference + code
       try:
         exec(code, def_dict)
       except Exception as e:
@@ -86,9 +87,9 @@ def get_policy_checker(Action, create_trajectory, plot_trajectory, sample_input,
           output=None,
           correction=f'Your code did not define a `{func_name}` function.')
       try:
-        #result = control(np.zeros((2,)), np.zeros((2,)), 0.0)
         result = control(*sample_input)
       except Exception as e:
+        print(traceback.format_exc())
         return llm_task.ProcessedOutput(
           output=None,
           correction=f'Your code raised an exception while running: {e}\n{traceback.format_exc()}')

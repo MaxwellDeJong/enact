@@ -41,6 +41,8 @@ class TaskInput(enact.RequestInput):
       'Please provide a task prompt')
 
 
+# TODO(max): check in improved error msg.
+@enact.register
 @dataclasses.dataclass
 class ProcessedOutput(enact.Resource):
   """A postprocessed output."""
