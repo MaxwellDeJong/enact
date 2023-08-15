@@ -50,7 +50,6 @@ class PolicyVisualizer(enact.Invokable):
 class CreatePolicy(enact.Invokable):
   """Create a policy function from a task description."""
   general_prompt: str
-  task_prompt: str
   func_name: str
   auxiliary_code: str = ''
   examples: List[llm_task.TaskExample] = dataclasses.field(
@@ -61,7 +60,7 @@ class CreatePolicy(enact.Invokable):
 
   def call(self, task_description: enact.Str):
     policy_checker = PolicyChecker(self.func_name, self.auxiliary_code)
-    full_prompt = self.general_prompt + '\n' + self.task_prompt
+    full_prompt = self.general_prompt + '\n' + task_description
     code_gen = llm_task.Task(
       full_prompt, self.examples, post_processor=policy_checker, max_retries=_MAX_RETRIES)
     return code_gen(task_description)
@@ -121,7 +120,8 @@ class PolicyChecker(enact.Invokable):
       return None
     return enact.Str(f'User critique: {critique}')
 
-  def call(self, input: enact.Str) -> llm_task.ProcessedOutput:
+  def call(self, input: enact.Str, prompt_for_user_critique: bool = False) -> (
+      llm_task.ProcessedOutput):
     """Process the provided input."""
     output = None
     correction = self._get_formatting_errors_correction(input)
@@ -132,8 +132,9 @@ class PolicyChecker(enact.Invokable):
       correction = self._get_execution_errors_correction(code)
 
     # Check for user corrections.
-    if correction is None:
-      correction = self._get_execution_critique_correction(code)
+    if prompt_for_user_critique:
+      if correction is None:
+        correction = self._get_execution_critique_correction(code)
 
     # Set the output if there are no corrections.
     if correction is None:
@@ -147,10 +148,35 @@ class PolicyChecker(enact.Invokable):
 class RecursivePolicyGen(enact.Invokable):
 
   general_prompt: enact.Str
+  top_level_policy_fn: enact.Str
   source_file: Optional[enact.Str] = None
+  code: str = ''
+  code_stubs: Dict[enact.Str, str] = dataclasses.field(default_factory=dict)
+  code_book: Dict[enact.Str, str] = dataclasses.field(default_factory=dict)
+
+  def _get_context(self) -> enact.Str:
+    if not self.code_stubs:
+      return enact.Str('')
+    prompt_prefix = (
+      '\nTo generate this function, you can call the following functions if needed: \n')
+    stubs = '\n'.join(self.code_stubs.values())
+    prompt_suffix = (
+      'Assume all of these functions are already defined and directly callable.')
+    return enact.Str(prompt_prefix + stubs + prompt_suffix)
+
+  def _update_code_stubs(self, func_name: enact.Str, code_str: str):
+    # We assume the code definition starts with '```', so we remove these
+    # characters.
+    code_str = code_str[len(_BACKTICKS_MD):]
+    code_stub = code_str.split('<INSERT IMPLEMENTATION HERE>')[0]
+    self.code_stubs[func_name] = code_stub
+
+  def _update_code_book(self, func_name: enact.Str, code_str: str):
+    self.code_stubs[func_name] = code_str
 
   def call(self, unused_resource: enact.NoneResource) -> enact.Str:
-    code: str = read_source_file(self.source_file) if self.source_file else ''
+    if self.code == '' and self.source_file:
+      self.code = read_source_file(self.source_file)
     while True:
       task_description: enact.Str = enact.request_input(
         enact.Str,
@@ -160,10 +186,14 @@ class RecursivePolicyGen(enact.Invokable):
       func_name = extract_func_name(task_description)
       if not func_name:
         break
+      code_context = self._get_context()
       create_policy = CreatePolicy(
-        self.general_prompt, task_description, func_name, code)
-      code += '\n' + create_policy(task_description) 
-    return enact.Str(code)
+        self.general_prompt, func_name, self.code)
+      generated_code = create_policy(task_description + code_context)
+      self._update_code_stubs(func_name, task_description)
+      self._update_code_book(func_name, generated_code)
+      self.code += '\n' + generated_code
+    return enact.Str(self.code)
 
 def extract_func_name(code_str: enact.Str) -> Optional[enact.Str]:
   """Extract the function name from a string."""
