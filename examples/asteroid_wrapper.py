@@ -150,6 +150,7 @@ class RecursivePolicyGen(enact.Invokable):
   general_prompt: enact.Str
   top_level_policy_fn: enact.Str
   source_file: Optional[enact.Str] = None
+  base_str: str = ''
   code: str = ''
   code_stubs: Dict[enact.Str, str] = dataclasses.field(default_factory=dict)
   code_book: Dict[enact.Str, str] = dataclasses.field(default_factory=dict)
@@ -171,12 +172,18 @@ class RecursivePolicyGen(enact.Invokable):
     code_stub = code_str.split('<INSERT IMPLEMENTATION HERE>')[0]
     self.code_stubs[func_name] = code_stub
 
+  def _minify_code_str(self, code_str: str) -> str:
+    if code_str.startswith(self.base_str):
+      return code_str[len(self.base_str):]
+    return code_str
+
   def _update_code_book(self, func_name: enact.Str, code_str: str):
-    self.code_stubs[func_name] = code_str
+    self.code_book[func_name] = self._minify_code_str(code_str)
 
   def call(self, unused_resource: enact.NoneResource) -> enact.Str:
-    if self.code == '' and self.source_file:
-      self.code = read_source_file(self.source_file)
+    if not self.base_str and self.source_file:
+      self.base_str = read_source_file(self.source_file)
+      self.code = self.base_str
     while True:
       task_description: enact.Str = enact.request_input(
         enact.Str,
@@ -192,6 +199,7 @@ class RecursivePolicyGen(enact.Invokable):
       generated_code = create_policy(task_description + code_context)
       self._update_code_stubs(func_name, task_description)
       self._update_code_book(func_name, generated_code)
+      generated_code = self._minify_code_str(generated_code)
       self.code += '\n' + generated_code
     return enact.Str(self.code)
 

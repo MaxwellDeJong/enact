@@ -107,7 +107,8 @@ class User(ChatAgent):
 @dataclasses.dataclass
 class GPTAgent(ChatAgent):
   """A chatbot that uses GPT to respond to messages."""
-  model: str = 'gpt-3.5-turbo'
+  #model: str = 'gpt-3.5-turbo'
+  model: str = 'gpt-4'
 
   def call(self, conversation: Conversation) -> Message:
     messages = [(m.role, m.content) for m in conversation.messages]
