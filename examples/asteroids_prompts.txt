@@ -1,0 +1,73 @@
+```
+def produce_torque(state: State) -> float:
+  """Orient an asteroids-style ship to a goal.
+  
+  Args:
+    state: State object encoding the game state. Attributes include
+      state.position: Numpy array representing the x and y player position.
+      state.goal_position: Numpy array representing the x and y goal position.
+      state.rotation: Numpy array representing the player rotation.
+
+      Note that each of these attributes has a batch dimension of 1, so the
+      current position of the player can be retrieved via state.position[0].
+
+  Returns:
+    A float representing the amount of torque to apply to the ship, between -1 and 1.
+  """
+  <INSERT IMPLEMENTATION HERE>
+```
+
+Do not define a State class but instead treat the class as already defined.
+
+################################################################################
+
+
+```
+def produce_thrust(state: State) -> float:
+  """Move an asteroids-style ship to a goal.
+  
+  Args:
+    state: State object encoding the game state. Attributes include
+      state.position: Numpy array representing the x and y player position.
+      state.goal_position: Numpy array representing the x and y goal position.
+      state.rotation: Numpy array representing the player rotation.
+
+      Note that each of these attributes has a batch dimension of 1, so the
+      current position of the player can be retrieved via state.position[0].
+
+  Returns:
+    A float representing the amount thrust to apply to the ship, between 0.0 and 1.
+  """
+  <INSERT IMPLEMENTATION HERE>
+```
+
+Do not define a State class but instead treat the class as already defined.
+
+################################################################################
+
+```
+def control(state: State) -> Action:
+  """Control an asteroids-style ship to move to a goal.
+  
+  Args:
+    state: State object encoding the game state. Attributes include
+      state.position: Numpy array representing the x and y player position.
+      state.goal_position: Numpy array representing the x and y goal position.
+      state.rotation: Numpy array representing the player rotation.
+
+      Note that each of these attributes has a batch dimension of 1, so the
+      current position of the player can be retrieved via state.position[0].
+
+  Returns:
+    An Action object, formed by first producing a pair of floats representing:
+      torque: The amount of torque to apply to the ship, between -1 and 1.
+      thrust: The amount of thrust to apply to the ship, between 0.0 and 1.
+
+    The floats should be returned by wrapping them in
+      Action(np.array([torque, thrust])[np.newaxis]).
+  """
+  <INSERT IMPLEMENTATION HERE>
+```
+
+Do not define a State or Action class but instead treat the classes as already
+defined.

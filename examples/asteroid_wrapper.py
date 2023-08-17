@@ -51,6 +51,7 @@ class CreatePolicy(enact.Invokable):
   """Create a policy function from a task description."""
   general_prompt: str
   func_name: str
+  prompt_for_critique: bool = False
   auxiliary_code: str = ''
   examples: List[llm_task.TaskExample] = dataclasses.field(
     default_factory=lambda: [
@@ -59,7 +60,8 @@ class CreatePolicy(enact.Invokable):
         '''```python\ndef add(x: int, y: int):\n  return x + y\n```''')])
 
   def call(self, task_description: enact.Str):
-    policy_checker = PolicyChecker(self.func_name, self.auxiliary_code)
+    policy_checker = PolicyChecker(
+      self.func_name, self.auxiliary_code, self.prompt_for_critique)
     full_prompt = self.general_prompt + '\n' + task_description
     code_gen = llm_task.Task(
       full_prompt, self.examples, post_processor=policy_checker, max_retries=_MAX_RETRIES)
@@ -71,6 +73,7 @@ class CreatePolicy(enact.Invokable):
 class PolicyChecker(enact.Invokable):
   func_name: str
   auxiliary_code: str = ''
+  prompt_for_critique: bool = False
 
   def _get_formatting_errors_correction(self, input: enact.Str) -> Optional[enact.Str]:
     """Return correction string if the input is improperly formatted."""
@@ -120,7 +123,7 @@ class PolicyChecker(enact.Invokable):
       return None
     return enact.Str(f'User critique: {critique}')
 
-  def call(self, input: enact.Str, prompt_for_user_critique: bool = False) -> (
+  def call(self, input: enact.Str) -> (
       llm_task.ProcessedOutput):
     """Process the provided input."""
     output = None
@@ -132,7 +135,7 @@ class PolicyChecker(enact.Invokable):
       correction = self._get_execution_errors_correction(code)
 
     # Check for user corrections.
-    if prompt_for_user_critique:
+    if self.prompt_for_critique:
       if correction is None:
         correction = self._get_execution_critique_correction(code)
 
@@ -194,8 +197,9 @@ class RecursivePolicyGen(enact.Invokable):
       if not func_name:
         break
       code_context = self._get_context()
+      prompt_for_critique = func_name == self.top_level_policy_fn
       create_policy = CreatePolicy(
-        self.general_prompt, func_name, self.code)
+        self.general_prompt, func_name, prompt_for_critique, self.code)
       generated_code = create_policy(task_description + code_context)
       self._update_code_stubs(func_name, task_description)
       self._update_code_book(func_name, generated_code)
